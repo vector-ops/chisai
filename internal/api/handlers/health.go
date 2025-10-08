@@ -8,5 +8,5 @@ import (
 
 func Health(w http.ResponseWriter, r *http.Request) {
 	// utils.WriteJSONResponse(w, http.StatusOK, map[string]interface{}{"message": "Hello, World!"})
-	utils.WriteTextResponse(w, http.StatusOK, "Hello, World!")
+	utils.WriteTextResponse(w, http.StatusOK, "Hello, !")
 }

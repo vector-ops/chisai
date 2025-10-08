@@ -4,9 +4,15 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+
+	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
+	"github.com/vector-ops/chisai/internal/api/routes"
 )
 
-type Server struct{}
+type Server struct {
+	mux *http.ServeMux
+	db  *dynamodb.Client
+}
 
 func NewServer() *Server {
 	return &Server{}
@@ -14,11 +20,14 @@ func NewServer() *Server {
 
 func (s *Server) Start() {
 	mux := http.NewServeMux()
+	err := InitDB()
+	if err != nil {
+		log.Fatal(err)
+	}
+	db := GetDB()
 
-	mux.HandleFunc("GET /", func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("Hello, World!"))
-	})
+	routes.RegisterHealthRoute(mux)
+	routes.RegisterURLRoutes(mux, db)
 
 	fmt.Printf("Listening on port :8000\n")
 	log.Fatal(http.ListenAndServe(":8000", mux))

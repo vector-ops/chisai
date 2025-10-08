@@ -1,0 +1,6 @@
+services:
+  database:
+    image: amazon/dynamodb-local
+    container_name: dynamodb_chisai
+    ports:
+      - "5100:8000"

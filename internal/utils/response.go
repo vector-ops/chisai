@@ -26,6 +26,13 @@ func WriteTextResponse(w http.ResponseWriter, status int, data string) error {
 	return err
 }
 
-func WriteErrorResponse(w http.ResponseWriter, data any) error {
-	return WriteJSONResponse(w, http.StatusInternalServerError, data)
+func WriteErrorResponse(w http.ResponseWriter, data error, status *int) error {
+	if status == nil {
+		status = toIntPointer(http.StatusInternalServerError)
+	}
+	return WriteJSONResponse(w, *status, map[string]any{"error": data.Error()})
+}
+
+func toIntPointer(i int) *int {
+	return &i
 }
