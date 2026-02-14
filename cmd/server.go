@@ -5,30 +5,29 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/vector-ops/chisai/internal/api/routes"
+	"go.mongodb.org/mongo-driver/v2/mongo"
 )
 
 type Server struct {
 	mux *http.ServeMux
-	db  *dynamodb.Client
+	db  *mongo.Database
 }
 
-func NewServer() *Server {
-	return &Server{}
+func NewServer(db *mongo.Database) *Server {
+	return &Server{db: db}
 }
 
 func (s *Server) Start() {
 	mux := http.NewServeMux()
-	err := InitDB()
-	if err != nil {
-		log.Fatal(err)
-	}
-	db := GetDB()
 
 	routes.RegisterHealthRoute(mux)
-	routes.RegisterURLRoutes(mux, db)
+	routes.RegisterURLRoutes(mux, s.db)
 
 	fmt.Printf("Listening on port :8000\n")
 	log.Fatal(http.ListenAndServe(":8000", mux))
+}
+
+func (s *Server) Close() error {
+	return nil
 }

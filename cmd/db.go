@@ -3,78 +3,49 @@ package cmd
 import (
 	"context"
 	"errors"
-	"log"
-	"time"
+	"log/slog"
+	"os"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb/types"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 const (
-	TableName = "url_store"
+	DatabaseName = "chisai"
 )
 
-var db *dynamodb.Client
+var db *mongo.Database
+var client *mongo.Client
 
 func InitDB() error {
-	db = dynamodb.NewFromConfig(aws.Config{
-		BaseEndpoint: aws.String("http://localhost:5100"),
-	})
+	uri := os.Getenv("MONGODB_URI")
+	if uri == "" {
+		return errors.New("MONGODB_URI env var not set")
+	}
 
-	if !tableExists(context.Background(), TableName) {
-		_, err := db.CreateTable(context.Background(), &dynamodb.CreateTableInput{
-			AttributeDefinitions: []types.AttributeDefinition{{
-				AttributeName: aws.String("url"),
-				AttributeType: types.ScalarAttributeTypeS,
-			}, {
-				AttributeName: aws.String("shortUrl"),
-				AttributeType: types.ScalarAttributeTypeS,
-			}},
-			KeySchema: []types.KeySchemaElement{
-				{
-					AttributeName: aws.String("shortUrl"),
-					KeyType:       types.KeyTypeHash,
-				},
-			},
-			TableName:   aws.String(TableName),
-			BillingMode: types.BillingModePayPerRequest,
-		})
-		if err != nil {
-			log.Printf("Couldn't create table %v. Here's why: %v\n", TableName, err)
-		} else {
-			waiter := dynamodb.NewTableExistsWaiter(db)
-			err = waiter.Wait(context.Background(), &dynamodb.DescribeTableInput{
-				TableName: aws.String(TableName),
-			}, 5*time.Minute)
-			if err != nil {
-				log.Printf("Wait for table exists failed. Here's why: %v\n", err)
-			}
-		}
+	c, err := mongo.Connect(options.Client().ApplyURI(uri))
+	if err != nil {
 		return err
 	}
+
+	client = c
+
+	err = client.Ping(context.TODO(), nil)
+	if err != nil {
+		return err
+	}
+
+	db = client.Database(DatabaseName)
+
+	slog.Info("Connected to monogdb...")
 
 	return nil
 }
 
-func GetDB() *dynamodb.Client {
+func GetDB() *mongo.Database {
 	return db
 }
 
-func tableExists(ctx context.Context, tableName string) bool {
-	exists := true
-	_, err := db.DescribeTable(
-		ctx, &dynamodb.DescribeTableInput{TableName: aws.String(tableName)},
-	)
-	if err != nil {
-		var notFoundEx *types.ResourceNotFoundException
-		if errors.As(err, &notFoundEx) {
-			log.Printf("Table %v does not exist.\n", tableName)
-			err = nil
-		} else {
-			log.Printf("Couldn't determine existence of table %v. Here's why: %v\n", tableName, err)
-		}
-		exists = false
-	}
-	return exists
+func Close(ctx context.Context) error {
+	return client.Disconnect(ctx)
 }

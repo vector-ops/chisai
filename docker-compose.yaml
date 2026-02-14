@@ -1,6 +1,19 @@
 services:
-  database:
-    image: amazon/dynamodb-local
-    container_name: dynamodb_chisai
+  mongo:
+    image: mongo:latest  
+    container_name: mongodb
+    restart: always
     ports:
-      - "5100:8000"
+      - "27018:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: user
+      MONGO_INITDB_ROOT_PASSWORD: password  
+    volumes:
+      - ./docker_volumes/mongo:/data/db
+      - ./docker_volumes/mongo-config:/data/configdb
+
+volumes:
+  mongo-data:
+    driver: local
+  mongo-config:
+    driver: local

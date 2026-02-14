@@ -2,28 +2,34 @@ package handlers
 
 import (
 	"net/http"
+	"strings"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	"github.com/aws/aws-sdk-go-v2/feature/dynamodb/attributevalue"
-	"github.com/aws/aws-sdk-go-v2/service/dynamodb"
 	"github.com/vector-ops/chisai/internal/utils"
+	"go.mongodb.org/mongo-driver/v2/bson"
+	"go.mongodb.org/mongo-driver/v2/mongo"
+	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
+
+type URLStore struct {
+	ShortURL    string `json:"shortUrl" bson:"shortUrl"`
+	RedirectURL string `json:"redirectUrl" bson:"redirectUrl"`
+}
 
 type ShortenURLRequestPayload struct {
 	URL string `json:"url"`
 }
 
-type UrlHandler struct {
-	db *dynamodb.Client
+type URLHandler struct {
+	db *mongo.Database
 }
 
-func NewUrlHandler(db *dynamodb.Client) *UrlHandler {
-	return &UrlHandler{
+func NewURLHandler(db *mongo.Database) *URLHandler {
+	return &URLHandler{
 		db: db,
 	}
 }
 
-func (h *UrlHandler) Shorten(w http.ResponseWriter, r *http.Request) {
+func (h *URLHandler) Shorten(w http.ResponseWriter, r *http.Request) {
 	var payload ShortenURLRequestPayload
 
 	err := utils.ReadJSONBody(r, &payload)
@@ -37,33 +43,33 @@ func (h *UrlHandler) Shorten(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	shortUrl := utils.GenerateShortURL(payload.URL)
+	shortURL := utils.GenerateShortURL(payload.URL)
 
-	item, err := attributevalue.MarshalMap(map[string]string{"shortUrl": shortUrl})
+	item := URLStore{ShortURL: shortURL, RedirectURL: payload.URL}
+
+	doc := bson.M{"$set": item}
+
+	opts := options.UpdateOne().SetUpsert(true)
+
+	_, err = h.db.Collection("url_store").UpdateOne(r.Context(), bson.M{"redirectUrl": payload.URL}, doc, opts)
 	if err != nil {
 		utils.WriteErrorResponse(w, err, nil)
 		return
 	}
 
-	_, err = h.db.PutItem(r.Context(), &dynamodb.PutItemInput{
-		Item:      item,
-		TableName: aws.String("url_store"),
-	})
-	if err != nil {
-		utils.WriteErrorResponse(w, err, nil)
-		return
-	}
-
-	utils.WriteJSONResponse(w, 201, map[string]any{"shortUrl": shortUrl})
+	utils.WriteJSONResponse(w, 201, map[string]any{"shortUrl": shortURL})
 }
 
-func (h *UrlHandler) GetUrl(w http.ResponseWriter, r *http.Request) {
+func (h *URLHandler) GetURL(w http.ResponseWriter, r *http.Request) {
 	p := r.URL.Path
-	// h.db.GetItem(r.Context(), &dynamodb.GetItemInput{
-	// 	Key: map[string]types.AttributeValue{
-	// 		"shortUrl": attributevalue.Marshal(payload.URL),
-	// 	},
-	// 	TableName: aws.String("url_store"),
-	// })
-	utils.WriteJSONResponse(w, 301, map[string]any{"message": p})
+	shortURL := strings.TrimLeft(p, "/")
+
+	var doc URLStore
+	err := h.db.Collection("url_store").FindOne(r.Context(), bson.M{"shortUrl": shortURL}).Decode(&doc)
+	if err != nil {
+		utils.WriteErrorResponse(w, err, nil)
+		return
+	}
+
+	http.Redirect(w, r, doc.RedirectURL, http.StatusMovedPermanently)
 }
