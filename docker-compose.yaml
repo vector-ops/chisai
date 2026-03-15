@@ -1,7 +1,7 @@
 services:
   mongo:
     image: mongo:latest  
-    container_name: mongodb
+    container_name: chisai_mongodb
     restart: always
     ports:
       - "27018:27017"
@@ -9,11 +9,22 @@ services:
       MONGO_INITDB_ROOT_USERNAME: user
       MONGO_INITDB_ROOT_PASSWORD: password  
     volumes:
-      - ./docker_volumes/mongo:/data/db
-      - ./docker_volumes/mongo-config:/data/configdb
+      - ./_docker_volumes/mongo:/data/db
+      - ./_docker_volumes/mongo-config:/data/configdb
+
+  redis:
+    image: redis:alpine
+    container_name: chisai_redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - ./_docker_volumes/redis-data:/data
+
 
 volumes:
   mongo-data:
     driver: local
   mongo-config:
+    driver: local
+  redis-data:
     driver: local
