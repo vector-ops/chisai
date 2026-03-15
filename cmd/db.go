@@ -17,7 +17,7 @@ const (
 var db *mongo.Database
 var client *mongo.Client
 
-func InitDB() error {
+func InitMongoDB() error {
 	uri := os.Getenv("MONGODB_URI")
 	if uri == "" {
 		return errors.New("MONGODB_URI env var not set")
@@ -42,10 +42,10 @@ func InitDB() error {
 	return nil
 }
 
-func GetDB() *mongo.Database {
+func GetMongoDB() *mongo.Database {
 	return db
 }
 
-func Close(ctx context.Context) error {
+func CloseMongoDB(ctx context.Context) error {
 	return client.Disconnect(ctx)
 }
