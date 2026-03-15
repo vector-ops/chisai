@@ -35,7 +35,11 @@ func main() {
 
 	slog.SetDefault(logger)
 
-	if err = cmd.InitDB(); err != nil {
+	if err = cmd.InitMongoDB(); err != nil {
+		log.Fatal(err)
+	}
+
+	if err = cmd.InitRedis(); err != nil {
 		log.Fatal(err)
 	}
 
@@ -43,12 +47,12 @@ func main() {
 
 	signal.Notify(cancelCh, syscall.SIGINT, syscall.SIGTERM)
 
-	server := cmd.NewServer(cmd.GetDB())
+	server := cmd.NewServer(cmd.GetMongoDB(), cmd.GetRedis())
 	go server.Start()
 
 	<-cancelCh
 
 	server.Close()
-	cmd.Close(context.TODO())
-
+	cmd.CloseMongoDB(context.TODO())
+	cmd.CloseRedis(context.TODO())
 }
